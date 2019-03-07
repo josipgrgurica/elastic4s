@@ -3,7 +3,7 @@ package com.sksamuel.elastic4s.http
 import com.sksamuel.elastic4s.{ElasticsearchClientUri, Show}
 import com.sksamuel.exts.Logging
 import org.apache.http.HttpHost
-import org.elasticsearch.client.RestClient
+import org.elasticsearch.client.{HttpAsyncResponseConsumerFactory, RestClient}
 import org.elasticsearch.client.RestClientBuilder.{HttpClientConfigCallback, RequestConfigCallback}
 
 import scala.language.higherKinds
@@ -60,8 +60,8 @@ object ElasticClient extends Logging {
     * @param client the Java client to wrap
     * @return newly created Scala client
     */
-  def fromRestClient[F[_] : Functor : Executor](client: RestClient): ElasticClient =
-    apply(new ElasticsearchJavaRestClient(client))
+  def fromRestClient[F[_] : Functor : Executor](client: RestClient, httpAsyncResponseConsumerFactory: HttpAsyncResponseConsumerFactory): ElasticClient =
+    apply(new ElasticsearchJavaRestClient(client, httpAsyncResponseConsumerFactory))
 
   /**
     * Creates a new [[ElasticClient]] using the elasticsearch Java API rest client
@@ -70,7 +70,7 @@ object ElasticClient extends Logging {
     * Alternatively, create a [[RestClient]] manually and invoke [[fromRestClient(RestClient)]].
     */
   def apply[F[_] : Functor : Executor](props: ElasticProperties): ElasticClient =
-    apply(props, NoOpRequestConfigCallback, NoOpHttpClientConfigCallback)
+    apply(props, NoOpRequestConfigCallback, NoOpHttpClientConfigCallback, HttpAsyncResponseConsumerFactory.DEFAULT)
 
   /**
     * Creates a new [[ElasticClient]] using the elasticsearch Java API rest client
@@ -80,7 +80,8 @@ object ElasticClient extends Logging {
     */
   def apply[F[_] : Functor : Executor](props: ElasticProperties,
                                        requestConfigCallback: RequestConfigCallback,
-                                       httpClientConfigCallback: HttpClientConfigCallback): ElasticClient = {
+                                       httpClientConfigCallback: HttpClientConfigCallback,
+                                       httpAsyncResponseConsumerFactory: HttpAsyncResponseConsumerFactory): ElasticClient = {
     val hosts = props.endpoints.map {
       case ElasticNodeEndpoint(protocol, host, port, _) => new HttpHost(host, port, protocol)
     }
@@ -92,7 +93,7 @@ object ElasticClient extends Logging {
       .setHttpClientConfigCallback(httpClientConfigCallback)
       .build()
 
-    ElasticClient.fromRestClient(client)
+    ElasticClient.fromRestClient(client, httpAsyncResponseConsumerFactory)
   }
 
   /**
@@ -104,7 +105,8 @@ object ElasticClient extends Logging {
   @deprecated("Use apply(ElasticProperties)", "6.3.3")
   def apply[F[_] : Functor : Executor](uri: ElasticsearchClientUri,
                                        requestConfigCallback: RequestConfigCallback = NoOpRequestConfigCallback,
-                                       httpClientConfigCallback: HttpClientConfigCallback = NoOpHttpClientConfigCallback
+                                       httpClientConfigCallback: HttpClientConfigCallback = NoOpHttpClientConfigCallback,
+                                       httpAsyncResponseConsumerFactory: HttpAsyncResponseConsumerFactory = HttpAsyncResponseConsumerFactory.DEFAULT
                                       ): ElasticClient = {
     val hosts = uri.hosts.map {
       case (host, port) =>
@@ -118,6 +120,6 @@ object ElasticClient extends Logging {
       .setHttpClientConfigCallback(httpClientConfigCallback)
       .build()
 
-    ElasticClient.fromRestClient(client)
+    ElasticClient.fromRestClient(client, httpAsyncResponseConsumerFactory)
   }
 }
